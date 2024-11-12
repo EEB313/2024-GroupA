@@ -1,0 +1,73 @@
+---
+title: "EEB313 Project"
+output: html_document
+date: "2024-11-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## 
+```{r}
+salamanders <- read.csv("redback_salamander_abundance.csv")
+unique(salamanders$Species)
+unique(salamanders$Sample.Year)
+salamanders
+unique(salamanders$Year)
+```
+
+```{r}
+present_salamanders <- salamanders %>%
+  slice(-c(1)) %>%
+  filter(!Eastern.Redback.Salamander.Count %in% "0") %>%
+  filter(!Redback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") %>%
+  filter(!Leadback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") 
+
+present_salamanders
+```
+```{r}
+redback_abundance <- present_salamanders %>%
+  group_by(Year, Redback.form.of.Eastern.Redback.Salamander.Count) %>%
+  tally()
+redback_abundance
+
+redback_abundance %>%
+  Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count %>%
+  mutate(redback.abundance = )
+  
+```
+
+
+
+
+```{r}
+redback_abundance <- present_salamanders %>%
+  # First convert the salamander count to numeric if it isn't already
+ mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year) %>% # Only group by Year
+  summarise(
+    n = n(),
+    Redback.form.of.Eastern.Redback.Salamander.Count = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE)
+  )
+
+# Now try the mutation
+redback_abundance %>%  
+  mutate(redback_abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
+```
+```{r}
+leadback_abundance <- present_salamanders %>%
+  # First convert the salamander count to numeric if it isn't already
+  mutate(Eastern.Redback.Salamander.Count = as.numeric(Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year) %>%  # Only group by Year
+  summarise(
+    n = n(),
+    Eastern.Redback.Salamander.Count = sum(Eastern.Redback.Salamander.Count, na.rm = TRUE)
+  )
+
+# Now try the mutation
+redback_abundance %>%  
+  mutate(redback_abundance = Eastern.Redback.Salamander.Count * n)
+```
+
