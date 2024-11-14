@@ -11,7 +11,7 @@ library(tidyverse)
 
 ## 
 ```{r}
-salamanders <- read.csv("redback_salamander_abundance.csv")
+salamanders <- read.csv("salamander.csv")
 unique(salamanders$Species)
 unique(salamanders$Sample.Year)
 salamanders
@@ -93,8 +93,13 @@ byyear_both
 
 ```{r}
 #Calculate the annual growth rate 
-byyear_both %>%
-  mutate(Redback_GrowthRate =  diff(year_redback_abun)/lag(year_redback_abun)) %>%
-  mutate(Leadback_GrowthRate =  diff(year_leadback_abun)/lag(year_leadback_abun))
+byyear_both <- byyear_both %>%
+  mutate(
+    Redback_GrowthRate = (year_redback_abun - lag(year_redback_abun)) / lag(year_redback_abun),
+    Leadback_GrowthRate = (year_leadback_abun - lag(year_leadback_abun)) / lag(year_leadback_abun)
+  )
+
+byyear_both
+
 ```
 
