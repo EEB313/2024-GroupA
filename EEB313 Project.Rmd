@@ -64,25 +64,13 @@ byyear_leadback <- leadback_abundance %>%
   summarize(year_leadback_abun = sum(leadback.abundance))
 
 byyear_leadback
+
+
+#ANOTHER EASIER WAY TO DO IT: pivot_longer -- have morph on one column and count data in other, group by morph, summarizing by taking the sum for eah year
+
+
 ```
 
-
-
-
-```{r}
-redback_abundance <- present_salamanders %>%
-  # First convert the salamander count to numeric if it isn't already
- mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
-  group_by(Year) %>% # Only group by Year
-  summarise(
-    n = n(),
-    Redback.form.of.Eastern.Redback.Salamander.Count = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE)
-  )
-
-# Now try the mutation
-redback_abundance %>%  
-  mutate(redback_abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
-```
 ```{r}
 #Combine the red back and lead back abundances by year 
 byyear_both <- cbind(byyear_redback, byyear_leadback) 
@@ -101,5 +89,64 @@ byyear_both <- byyear_both %>%
 
 byyear_both
 
+#Calculating average temperature by year 
+
+temp_by_year <- present_salamanders %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  group_by(Year) %>%
+  summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
+
+# Join with byyear_both
+byyear_both <- byyear_both %>%
+  left_join(temp_by_year, by = "Year")
+
+byyear_both
+
+#WHY IS 2017 NA FOR LEADBACK? CHECK
 ```
 
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+# Update the column name
+byyear_both <- byyear_both %>%
+  mutate(avg_temp = as.numeric(avg_temp))
+
+# Fit non-linear models for Redback and Leadback growth rates
+redback_model <- nls(Redback_GrowthRate ~ a * exp(-((avg_temp - b)^2) / (2 * c^2)),
+                     data = byyear_both,
+                     start = list(a = 1, b = mean(byyear_both$avg_temp), c = 1))
+
+leadback_model <- nls(Leadback_GrowthRate ~ a * exp(-((avg_temp - b)^2) / (2 * c^2)),
+                      data = byyear_both,
+                      start = list(a = 1, b = mean(byyear_both$avg_temp), c = 1))
+
+# Predict values for plotting
+temperature_seq <- seq(min(byyear_both$avg_temp), max(byyear_both$avg_temp), length.out = 100)
+redback_pred <- predict(redback_model, newdata = data.frame(avg_temp = temperature_seq))
+leadback_pred <- predict(leadback_model, newdata = data.frame(avg_temp = temperature_seq))
+
+# Combine predictions into a dataframe
+plot_data <- data.frame(
+  avg_temp = temperature_seq,
+  Redback_GrowthRate = redback_pred,
+  Leadback_GrowthRate = leadback_pred
+)
+
+# Plot the thermal response curves
+ggplot() +
+  geom_point(data = byyear_both, aes(x = avg_temp, y = Redback_GrowthRate, color = "Redback"), size = 2) +
+  geom_point(data = byyear_both, aes(x = avg_temp, y = Leadback_GrowthRate, color = "Leadback"), size = 2) +
+  geom_line(data = plot_data, aes(x = avg_temp, y = Redback_GrowthRate, color = "Redback"), size = 1) +
+  geom_line(data = plot_data, aes(x = avg_temp, y = Leadback_GrowthRate, color = "Leadback"), size = 1) +
+  labs(title = "Thermal Response Curves for Salamander Morphs",
+       x = "Average Temperature (°C)", y = "Growth Rate",
+       color = "Morph") +
+  theme_minimal()
+
+```
+
+MAYBE TEMPERATURE DOESNT ACTUALLY PREDIT ANYTHING? Lets try precipitation!
