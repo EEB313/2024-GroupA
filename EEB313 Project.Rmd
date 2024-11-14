@@ -28,15 +28,42 @@ present_salamanders <- salamanders %>%
 present_salamanders
 ```
 ```{r}
+#redback abundance by year 
+
 redback_abundance <- present_salamanders %>%
   group_by(Year, Redback.form.of.Eastern.Redback.Salamander.Count) %>%
   tally()
 redback_abundance
 
-redback_abundance %>%
-  Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count %>%
-  mutate(redback.abundance = )
-  
+
+redback_abundance <- redback_abundance %>%
+  mutate(across(c(Redback.form.of.Eastern.Redback.Salamander.Count, n), as.numeric)) %>%
+  mutate(redback.abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
+
+
+byyear_redback <- redback_abundance %>%
+  group_by(Year) %>%
+  summarize(year_redback_abun = sum(redback.abundance))
+
+byyear_redback
+
+#leadback abundance by year 
+leadback_abundance <- present_salamanders %>%
+  group_by(Year, Leadback.form.of.Eastern.Redback.Salamander.Count) %>%
+  tally()
+leadback_abundance
+
+
+leadback_abundance <- leadback_abundance %>%
+  mutate(across(c(Leadback.form.of.Eastern.Redback.Salamander.Count, n), as.numeric)) %>%
+  mutate(leadback.abundance = Leadback.form.of.Eastern.Redback.Salamander.Count * n)
+
+
+byyear_leadback <- leadback_abundance %>%
+  group_by(Year) %>%
+  summarize(year_leadback_abun = sum(leadback.abundance))
+
+byyear_leadback
 ```
 
 
@@ -57,17 +84,17 @@ redback_abundance %>%
   mutate(redback_abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
 ```
 ```{r}
-leadback_abundance <- present_salamanders %>%
-  # First convert the salamander count to numeric if it isn't already
-  mutate(Eastern.Redback.Salamander.Count = as.numeric(Eastern.Redback.Salamander.Count)) %>%
-  group_by(Year) %>%  # Only group by Year
-  summarise(
-    n = n(),
-    Eastern.Redback.Salamander.Count = sum(Eastern.Redback.Salamander.Count, na.rm = TRUE)
-  )
+#Combine the red back and lead back abundances by year 
+byyear_both <- cbind(byyear_redback, byyear_leadback) 
+byyear_both <- byyear_both[,-3]
+byyear_both
 
-# Now try the mutation
-redback_abundance %>%  
-  mutate(redback_abundance = Eastern.Redback.Salamander.Count * n)
+```
+
+```{r}
+#Calculate the annual growth rate 
+byyear_both %>%
+  mutate(Redback_GrowthRate =  diff(year_redback_abun)/lag(year_redback_abun)) %>%
+  mutate(Leadback_GrowthRate =  diff(year_leadback_abun)/lag(year_leadback_abun))
 ```
 
