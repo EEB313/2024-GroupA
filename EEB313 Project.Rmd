@@ -105,6 +105,56 @@ byyear_both
 #WHY IS 2017 NA FOR LEADBACK? CHECK
 ```
 
+```{r}
+#Doing it the other way
+byyear_both <- byyear_both %>%
+  mutate(Redback_GrowthRate = (year_redback_abun) / lag(year_redback_abun),
+         Leadback_GrowthRate = (year_leadback_abun / lag(year_leadback_abun))
+
+
+
+#Calculating average temperature by year 
+
+temp_by_year <- present_salamanders %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  group_by(Year) %>%
+  summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
+
+# Join with byyear_both
+byyear_both <- byyear_both %>%
+  left_join(temp_by_year, by = "Year")
+
+#Remove 2017 and 2018 which have NA for Leadback Growth Rates
+byyear_both <- byyear_both |>
+  filter(!Leadback_GrowthRate %in% c("2017", "2018")
+  
+byyear_both
+#WHY IS 2017 NA FOR LEADBACK? CHECK
+```
+
+```{r}
+# Doing it the other way
+byyear_both <- byyear_both %>%
+  mutate(
+    Redback_GrowthRate = year_redback_abun / lag(year_redback_abun),
+    Leadback_GrowthRate = year_leadback_abun / lag(year_leadback_abun)
+  ) # Closing mutate properly
+
+# Calculating average temperature by year
+temp_by_year <- present_salamanders %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  group_by(Year) %>%
+  summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
+
+# Join with byyear_both
+byyear_both <- byyear_both %>%
+  left_join(temp_by_year, by = "Year")
+
+byyear_both
+
+
+```
+
 
 ```{r}
 library(ggplot2)
