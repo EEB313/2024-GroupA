@@ -1,0 +1,57 @@
+---
+title: "EEB313 Project"
+output: html_document
+date: "2024-11-12"
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+```
+
+## 
+```{r}
+salamanders <- read.csv("salamander.csv")
+unique(salamanders$Species)
+unique(salamanders$Sample.Year)
+salamanders
+unique(salamanders$Year)
+```
+
+```{r}
+present_salamanders <- salamanders %>%
+  slice(-c(1)) %>%
+  filter(!Eastern.Redback.Salamander.Count %in% "0") %>%
+  filter(!Redback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") %>%
+  filter(!Leadback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") 
+
+present_salamanders
+```
+```{r}
+
+redback_abundance <- present_salamanders %>%
+  mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Survey.Number, Plot.Name) %>%
+  summarize(redback_abun = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
+
+leadback_abundance <- present_salamanders %>%
+  mutate(Leadback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Leadback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Survey.Number, Plot.Name) %>%
+  summarize(leadback_abun = sum(Leadback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
+
+```
+
+
+
+
+```{r}
+total_abundance <- data.frame(redback_abundance, leadback_abundance$leadback_abun)
+total_abundance
+```
+```{r}
+total_abundance <- total_abundance %>% 
+  mutate(redback_growthrate = ())
+```
+
+
+
