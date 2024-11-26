@@ -7,6 +7,7 @@ date: "2024-11-12"
 ```{r setup, include=FALSE}
 
 library(tidyverse)
+library(dplyr)
 ```
 
 ## 
@@ -27,16 +28,17 @@ present_salamanders <- salamanders %>%
 
 present_salamanders
 ```
+
 ```{r}
 
 redback_abundance <- present_salamanders %>%
   mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
-  group_by(Year, Survey.Number, Plot.Name) %>%
+  group_by(Year, Plot.Name) %>%
   summarize(redback_abun = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
 
 leadback_abundance <- present_salamanders %>%
   mutate(Leadback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Leadback.form.of.Eastern.Redback.Salamander.Count)) %>%
-  group_by(Year, Survey.Number, Plot.Name) %>%
+  group_by(Year, Plot.Name) %>%
   summarize(leadback_abun = sum(Leadback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
 
 ```
@@ -47,11 +49,53 @@ leadback_abundance <- present_salamanders %>%
 ```{r}
 total_abundance <- data.frame(redback_abundance, leadback_abundance$leadback_abun)
 total_abundance
+
+plot(total_abundance$Year, total_abundance$redback_abun)
 ```
+
+
 ```{r}
+# total_abundance <- total_abundance %>%
+#   mutate(
+#     redback_abundance = as.numeric(redback_abundance),
+#     leadback_abundance = as.numeric(leadback_abundance)
+#   )
+
 total_abundance <- total_abundance %>% 
-  mutate(redback_growthrate = ())
+  group_by(Plot.Name) |>
+  mutate(
+    Redback_GrowthRate = redback_abun / lag(redback_abun),
+    Leadback_GrowthRate = leadback_abundance.leadback_abun / lag(leadback_abundance.leadback_abun)
+  )
+
+
 ```
 
 
+```{r}
+temp_by_year <- present_salamanders %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  group_by(Year) %>%
+  summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
+
+# Join with byyear_both
+total_abundance <- total_abundance%>%
+  left_join(temp_by_year, by = "Year")
+
+#Remove all NAs??? idk if we should 
+total_abundance <- total_abundance |>
+  na.omit(total_abundance)
+```
+
+```{r}
+total_abundance |>
+  ggplot(aes(Year, redback_abun)) +
+  geom_point() +
+  facet_wrap(~Plot.Name)
+
+total_abundance |>
+  ggplot(aes(avg_temp, Redback_GrowthRate)) +
+  geom_point() +
+  facet_wrap(~Plot.Name)
+```
 
