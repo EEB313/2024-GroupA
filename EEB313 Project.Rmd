@@ -7,6 +7,7 @@ date: "2024-11-12"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(lubridate)
 ```
 
 ## 
@@ -16,160 +17,336 @@ unique(salamanders$Species)
 unique(salamanders$Sample.Year)
 salamanders
 unique(salamanders$Year)
-```
+unique(salamanders$Date)
+unique(salamanders$Plot.Name)
 
-```{r}
+#Clean out the NAs
 present_salamanders <- salamanders %>%
   slice(-c(1)) %>%
-  filter(!Eastern.Redback.Salamander.Count %in% "0") %>%
   filter(!Redback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") %>%
   filter(!Leadback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") 
-
 present_salamanders
+
+salamanders
+#string extract all and put as a numeric (str)- str_extract_all[colname, "[0-9]+"]
 ```
+
+
 ```{r}
-#redback abundance by year 
+#Fix the Dates for present Salamanders/orginal Dataset 
+present_salamanders <- present_salamanders %>%
+   mutate(Date = dmy(Date),  
+         Month = month(Date, label = TRUE)) 
+present_salamanders 
+
 
 redback_abundance <- present_salamanders %>%
-  group_by(Year, Redback.form.of.Eastern.Redback.Salamander.Count) %>%
-  tally()
-redback_abundance
+  mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(redback_abun = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
 
 
-redback_abundance <- redback_abundance %>%
-  mutate(across(c(Redback.form.of.Eastern.Redback.Salamander.Count, n), as.numeric)) %>%
-  mutate(redback.abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
+# Then check the result
 
+head(redback_abundance)
 
-byyear_redback <- redback_abundance %>%
-  group_by(Year) %>%
-  summarize(year_redback_abun = sum(redback.abundance))
+#leadback abundance 
 
-byyear_redback
-
-#leadback abundance by year 
 leadback_abundance <- present_salamanders %>%
-  group_by(Year, Leadback.form.of.Eastern.Redback.Salamander.Count) %>%
-  tally()
-leadback_abundance
+  mutate(Leadback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Leadback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(leadback_abun = sum(Leadback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
+head(leadback_abundance)
 
 
-leadback_abundance <- leadback_abundance %>%
-  mutate(across(c(Leadback.form.of.Eastern.Redback.Salamander.Count, n), as.numeric)) %>%
-  mutate(leadback.abundance = Leadback.form.of.Eastern.Redback.Salamander.Count * n)
+total_abundances <- full_join(redback_abundance, leadback_abundance, 
+                             by = c("Month", "Year", "Plot.Name"))
+total_abundances
 
+#plot the abundances across months and years - different visualizations
 
-byyear_leadback <- leadback_abundance %>%
-  group_by(Year) %>%
-  summarize(year_leadback_abun = sum(leadback.abundance))
+#Point plot
+ggplot(total_abundances, aes(x = Month, y = redback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  facet_wrap(~Year) +  
+  labs(x = "Month", 
+       y = "Redback Abundance",
+       title = "Redback Salamander Abundance by Month and Year") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
 
-byyear_leadback
+#boxplot 
+ggplot(total_abundances, aes(x = Month)) +
+  geom_boxplot(aes(y = leadback_abun, fill = "Leadback"), alpha = 0.7) +
+  geom_boxplot(aes(y = redback_abun, fill = "Redback"), alpha = 0.7) +
+  facet_wrap(~Year) +
+  scale_fill_manual(values = c("Leadback" = "lightblue", "Redback" = "coral")) +
+  labs(x = "Month", 
+       y = "Salamander Abundance",
+       title = "Distribution of Salamander Abundance by Month and Year",
+       fill = "Morph") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom")
+
+#column plots
+ggplot(total_abundances, aes(x = Month)) +
+  geom_col(aes(y = redback_abun, fill = "Redback"), position = position_dodge(width = 0.8)) +
+  geom_col(aes(y = leadback_abun, fill = "Leadback"), position = position_dodge(width = 0.8)) +
+  facet_wrap(~Plot.Name, scales = "free_y") +  # Allow y-axis to vary by facet
+  scale_fill_manual(values = c("Leadback" = "lightblue", "Redback" = "coral")) +
+  labs(x = "Month", 
+       y = "Salamander Abundance",
+       title = "Salamander Abundance by Site and Morph",
+       fill = "Morph") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(size = 8),
+        legend.position = "bottom")
+
+#Facet grid by Plot name and year
+ggplot(total_abundances, aes(x = Month)) +
+  geom_col(aes(y = redback_abun, fill = "Redback"), position = position_dodge(width = 0.8)) +
+  geom_col(aes(y = leadback_abun, fill = "Leadback"), position = position_dodge(width = 0.8)) +
+  facet_grid(Plot.Name ~ Year, scales = "free_y") +
+  scale_fill_manual(values = c("Leadback" = "lightblue", "Redback" = "coral")) +
+  labs(x = "Month", 
+       y = "Salamander Abundance",
+       title = "Salamander Abundance by Site, Month and Year",
+       fill = "Morph") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(size = 8),
+        panel.spacing = unit(1, "lines"),
+        legend.position = "bottom")
 ```
 
 
 
 
 ```{r}
-redback_abundance <- present_salamanders %>%
-  # First convert the salamander count to numeric if it isn't already
- mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
-  group_by(Year) %>% # Only group by Year
-  summarise(
-    n = n(),
-    Redback.form.of.Eastern.Redback.Salamander.Count = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE)
-  )
-
-# Now try the mutation
-redback_abundance %>%  
-  mutate(redback_abundance = Redback.form.of.Eastern.Redback.Salamander.Count * n)
-
-
-```
-```{r}
-#Combine the red back and lead back abundances by year 
-byyear_both <- cbind(byyear_redback, byyear_leadback) 
-byyear_both <- byyear_both[,-3]
-byyear_both
-
-```
-
-```{r}
-#Calculate the annual growth rate 
-# years <- c(2007:2019)
-# 
-# Redback_GrowthRate <- numeric(length(years))
-# Leadback_GrowthRate <- numeric(length(years))
-# year_redback_abun <- byyear_both$year_redback_abun
-# year_leadback_abun <- byyear_both$year_leadback_abun
-# 
-# for (i in 2:length(years)){
-#  Redback_GrowthRate <- year_redback_abun[i]/year_redback_abun[i-1]
-#  Leadback_GrowthRate <-  year_leadback_abun[i]/year_leadback_abun[i-1]
-# }
-
-#Calculate the annual growth rate 
-## Annual geometric population growth rates
-# redback annual growth rate
-N_redback <- byyear_both$year_redback_abun
-lambda_red <- c()
-# Vector of population abundances lambda <- c() # Empty vector to store lambda values
-for (i in 1:length(N_redback)-1) { 
-  lambda_red[i] <- ((N_redback[i + 1])/N_redback[i])
-} 
-lambda_red <- data.frame(lambda_red)
-lambda_red
-
-# lead back annual growth rates 
-N_leadback <- byyear_both$year_leadback_abun
-lambda_lead <- c()
-# Vector of population abundances lambda <- c() # Empty vector to store lambda values
-for (i in 1:length(N_leadback)-1) { 
-  lambda_lead[i] <- ((N_leadback[i + 1])/N_leadback[i])
-} 
-lambda_lead <- data.frame(lambda_lead)
-lambda_lead
-
-lambda_red <- data.frame(lambda_red = c(NA, lambda_red$lambda_red))
-lambda_lead <- data.frame(lambda_lead = c(NA, lambda_lead$lambda_lead))
-
-# Now combine with byyear_both
-salamanders_growth_rates <- data.frame(byyear_both, 
-                                     lambda_lead = lambda_lead,
-                                     lambda_red = lambda_red)
-#Calculating average temperature by year 
-
-
-temp_by_year <- present_salamanders %>%
+#now I want to organize the data set to where I can next calculate the monthly growth rates for each location 
+#find the average temperature for a given month, year, and loaction
+temp_by_month_and_year <- present_salamanders %>%
+  filter(!Air.Temperature..degC. %in% "N/A") %>%
   mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
-  group_by(Year) %>%
+  group_by(Year, Month, Plot.Name) %>%
   summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
 
-# Join with byyear_both
-byyear_both_temps <- salamanders_growth_rates %>%
-  left_join(temp_by_year, by = "Year")
-
-byyear_both_temps
-
+temp_by_month_and_year$Year <- as.numeric(temp_by_month_and_year$Year) #convert this to numeric
+temp_by_month_and_year
 
 ```
 
 ```{r}
-#Plot the growth rates as a function of temperature 
-byyear_both_temps %>%
-  ggplot(aes(x = avg_temp, y = lambda_red)) +
-  geom_point() +
-  geom_smooth(method = "nls", 
-              formula = y ~ a * x^b,
-              method.args = list(start = list(a = 1, b = 1)))
+#join the temperatures with the abundance data 
+total_abundances$Year <- as.numeric(temp_by_month_and_year$Year) #convert this to numeric
 
-byyear_both_temps %>%
-  ggplot(aes(x = avg_temp, y = lambda_lead)) +
-  geom_point() +
-  geom_smooth(method = "nls", 
-              formula = y ~ a * x^b,
-              method.args = list(start = list(a = 1, b = 1)))
-#try precipitation 
+
+abun_and_temps <- full_join(total_abundances, temp_by_month_and_year,
+                             by = c("Year", "Plot.Name", "Month"))
+
+abun_and_temps
 ```
+
+
+
+```{r}
+#Plot to see patterns with air 
+ggplot(abun_and_temps, aes(x = avg_temp, y = redback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Temperature", 
+       y = "Redback Abundance",
+       title = "Redback Salamander Abundance with Average Temperature") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+
+
+ggplot(abun_and_temps, aes(x = avg_temp, y = leadback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Temperature", 
+       y = "Leadback Abundance",
+       title = "Leadback Salamander Abundance with Average Temperature") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+
+ggplot(abun_and_temps, aes(x = avg_temp, y = leadback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  facet_wrap(~Plot.Name) +  
+  labs(x = "Average Temperature", 
+       y = "Leadback Abundance",
+       title = "Redback Salamander Abundance with Average Temperature by Survey Site") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+
+ggplot(abun_and_temps, aes(x = Year, y = avg_temp, color = Month, group = Month)) +
+  geom_point(linewidth = 1) + 
+  facet_wrap(~Plot.Name) +  
+  labs(x = "Year", 
+       y = "Average Temperature",
+       title = "Average Temperature Trends by Month Across Years",
+       color = "Month") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        legend.position = "bottom") 
+```
+#is a linear or quadratic approach more appropriate to model the data - use a regression to model the data and select the best model- combine the sites 
+
+```{r}
+#redback separate models 
+glmmodelred <- glm(redback_abun ~ avg_temp, data = abun_and_temps)
+summary(glmmodelred)
+AIC(glmmodelred)
+summary(glmmodelred)
+
+quadmodelred <- lm(redback_abun ~ avg_temp + I(avg_temp^2) + avg_temp*redback_abun, data = abun_and_temps, family = "poisson")
+summary(quadmodelred)
+AIC(quadmodelred)
+
+
+glmmodelred <- glm(redback_abun ~ avg_temp, data = abun_and_temps)
+quadmodelred <- glm(redback_abun ~ avg_temp + I(avg_temp^2), data = abun_and_temps)
+
+# Create prediction data
+new_data <- data.frame(
+    avg_temp = seq(min(abun_and_temps$avg_temp), 
+                  max(abun_and_temps$avg_temp), 
+                  length.out = 100)
+)
+
+# Get predictions
+preds_linear <- predict(glmmodelred, newdata = new_data, type = "response")
+preds_quad <- predict(quadmodelred, newdata = new_data, type = "response")
+
+# Plot
+ggplot(abun_and_temps, aes(x = avg_temp, y = redback_abun)) +
+  geom_point(alpha = 0.5) +
+  geom_line(data = data.frame(avg_temp = new_data$avg_temp,
+                             pred = predict(quadmodelred, newdata = new_data)),
+            aes(x = avg_temp, y = pred, color = "Quadratic"), size = 1) +
+  scale_color_manual(values = c("Quadratic" = "red")) +
+  labs(x = "Average Temperature (°C)",
+       y = "Redback Abundance",
+       title = "Temperature Effects on Redback Salamander Abundance",
+       color = "Model Type") +
+  theme_bw() +
+  theme(
+  panel.grid = element_blank(),  # remove gridlines
+    legend.position = "topright",  # move legend to top right
+    legend.background = element_rect(fill = "white"), # white legend background
+    legend.box.background = element_rect(color = "black"), # black box around legend
+    legend.title = element_blank(), # remove legend title
+    axis.line = element_line(color = "black"), # black axis lines
+    panel.border = element_rect(color = "black", fill = NA), # black border
+    plot.title = element_text(hjust = 0.5))
+
+#leadback separate models 
+glmmodellead <- glm(leadback_abun ~ avg_temp, data = abun_and_temps)
+summary(glmmodelred)
+AIC(glmmodelred)
+
+quadmodellead <- lm(leadback_abun ~ avg_temp + I(avg_temp^2) + avg_temp*leadback_abun, data = abun_and_temps, family = "poisson")
+summary(quadmodellead)
+AIC(quadmodellead)
+#fitting predictive model to leadback 
+# Plot
+preds_linear <- predict(glmmodellead, newdata = new_data, type = "response")
+preds_quad <- predict(quadmodellead, newdata = new_data, type = "response")
+
+ggplot(abun_and_temps, aes(x = avg_temp, y = leadback_abun)) +
+  geom_point(alpha = 0.5) +
+  geom_line(data = data.frame(avg_temp = new_data$avg_temp,
+                             pred = predict(glmmodellead, newdata = new_data)),
+            aes(x = avg_temp, y = pred, color = "Linear"), size = 1) +
+  scale_color_manual(values = c("Linear" = "blue")) + 
+  labs(x = "Average Temperature (°C)",
+       y = "Leadback Abundance",
+       title = "Temperature Effects on Leadback Salamander Abundance",
+       color = "Model Type") +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),  # remove gridlines
+    legend.position = "topright",  # move legend to top right
+    legend.background = element_rect(fill = "white"), # white legend background
+    legend.box.background = element_rect(color = "black"), # black box around legend
+    legend.title = element_blank(), # remove legend title
+    axis.line = element_line(color = "black"), # black axis lines
+    panel.border = element_rect(color = "black", fill = NA), # black border
+    plot.title = element_text(hjust = 0.5))
+
+glmmodellead <- glm(leadback_abun ~ avg_temp + avg_temp*leadback_abun, data = abun_and_temps)
+summary(glmmodellead)
+AIC(glmmodellead)
+
+
+glmmodel <- glm(abundance ~ temp + temp*eco_morph, data = data)
+summary(glmmodel)
+AIC(glmmodel)
+
+rbind(
+  data.frame(abundance = as.numeric(abun_and_temps$leadback_abun), eco_morph = "leadback", temp = as.numeric(abun_and_temps$avg_temp)),
+  data.frame(abundance = as.numeric(abun_and_temps$redback_abun), eco_morph = "redback", temp = as.numeric(abun_and_temps$avg_temp))
+) -> data
+
+data
+#glm
+glmmodel <- glm(abundance ~ temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
+summary(glmmodel)
+AIC(glmmodel)
+#quad regression
+quadmodel <- lm(abundance ~ temp + eco_morph+ I(temp^2) + temp*eco_morph  , data = data, family = "poisson")
+summary(quadmodel)
+AIC(quadmodel)
+
+
+#visualize 
+# Create prediction grid
+new_data <- expand.grid(
+    temp = seq(min(data$temp), max(data$temp), length.out = 100),
+    eco_morph = unique(data$eco_morph)
+)
+
+# Get predictions
+preds <- predict(quadmodel, newdata = new_data, type = "response")
+new_data$predicted <- preds
+
+# Plot
+plot(abundance ~ temp, data = data, col = as.factor(eco_morph), pch = 16, 
+     main = "Temperature Effects on Salamander Abundance",
+     xlab = "Temperature (°C)",
+     ylab = "Abundance")
+     
+# Add lines for each eco_morph
+  for(morph in unique(data$eco_morph)) {
+    subset_data <- new_data[new_data$eco_morph == morph,]
+    lines(subset_data$temp, subset_data$predicted, 
+          col = as.factor(morph))
+    }
+legend("topright", 
+       legend = unique(data$eco_morph),
+       col = as.factor(unique(data$eco_morph)), 
+       pch = 16)
+
+#we need to fit a distribution into the function and it does not seem normal, and add interaction term of ecomorph
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
