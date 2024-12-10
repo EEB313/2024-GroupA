@@ -376,7 +376,6 @@ new_data <- expand.grid(
 )
 
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
-new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
 
 
 ggplot(data, aes(x = num_observations, y = abundance, color = eco_morph)) +
@@ -397,11 +396,9 @@ This graph helps visualize that when all other covariates are held constant, the
 Now, we want to look at how abundance patterns with year change, with all other covariates held constant.
 
 ```{r}
-# Define fixed values for predictors
+#Change fixed params
 fixed_observations <- max(data$num_observations) #holding number of observations constant at highest number 
-fixed_temp <- mean(data$temp) # Hold temperature constant at the average 
 changing_year <- data$year 
-eco_morph <- c("redback", "leadback") 
 
 new_data <- expand.grid(
   temp = fixed_temp, 
@@ -410,7 +407,6 @@ new_data <- expand.grid(
   year = changing_year
 )
 
-new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
 
 
