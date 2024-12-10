@@ -235,11 +235,31 @@ abun_temps_precip <- abun_temps_precip%>%
 
 
 ```
+Lets visualize how abundances change in response to precipitation with the raw data: 
+```{r}
+abun_temps_precip %>%
+  ggplot(aes(x = avg_precip, y = redback_abun)) + 
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Precipitation", 
+       y = "Redback Abundance",
+       title = "Redback Salamander Abundance with Average Precipitation") +
+  theme_minimal() 
+
+abun_temps_precip %>%
+  ggplot(aes(x = avg_precip, y = leadback_abun)) + 
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Precipitation", 
+       y = "Leadback Abundance",
+       title = "Leadback Salamander Abundance with Average Precipitation") +
+  theme_minimal() 
+```
+There appears to not be a lot of observations at various precipitation levels and lots of clustering, but we will incorporate it in our model as a covariate to see if there is any statistically significant relationship. 
 
 Now to create the data frame that will be used to fit this new model:
 
 ```{r}
-
 rbind(
   data.frame(abundance = as.numeric(abun_temps_precip$leadback_abun), eco_morph = "leadback", temp = as.numeric(abun_temps_precip$avg_temp), precipitation = as.numeric(abun_temps_precip$avg_precip), location = abun_temps_precip$Plot.Name),
   data.frame(abundance = as.numeric(abun_temps_precip$redback_abun), eco_morph = "redback", temp = as.numeric(abun_temps_precip$avg_temp), precipitation = as.numeric(abun_temps_precip$avg_precip), location = abun_temps_precip$Plot.Name)
