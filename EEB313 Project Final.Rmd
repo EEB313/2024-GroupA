@@ -265,7 +265,7 @@ new_abun_temp_precip <- abun_temps_precip %>%
   summarize(yearly_abun_lead = sum(leadback_abun),
             yearly_abun_red = sum(redback_abun)) %>%
   arrange((Year))
-#If we want to look at growth rates, lets first look at how abundance patterns are changing annually 
+#lets first look at how abundance patterns are changing annually 
 
 plot(new_abun_temp_precip$Year, new_abun_temp_precip$yearly_abun_lead, type = 'l', 
      col = 'blue3', 
@@ -298,7 +298,7 @@ testforfrequency <- present_salamanders %>%
 
 testforfrequency %>%
   ggplot() +
-  geom_histogram(aes(x = Air.Temperature..degC.), bins = 30) + # Adjust bins as needed
+  geom_histogram(aes(x = Air.Temperature..degC.), bins = 30) + 
   labs(title = "Frequency of Observations by Temperature", x = "Temperature (°C)", y = "Number of Observations") +
   theme_minimal()
 ```
@@ -368,7 +368,6 @@ fixed_temp <- mean(data$temp) # Hold temperature constant at the average
 fixed_year <- median(data$year) # Hold year constant using the median year
 eco_morph <- c("redback", "leadback") 
 
-# Hold other variables constant (e.g., set temp, eco_morph, and year to representative values)
 new_data <- expand.grid(
   temp = fixed_temp, 
   eco_morph = eco_morph, 
@@ -376,9 +375,7 @@ new_data <- expand.grid(
   year = fixed_year
 )
 
-# Predict abundance for this new dataset
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
-# Predict abundance for this range of sampling efforts
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
 
 
@@ -406,7 +403,6 @@ fixed_temp <- mean(data$temp) # Hold temperature constant at the average
 changing_year <- data$year 
 eco_morph <- c("redback", "leadback") 
 
-# Hold other variables constant (e.g., set temp, eco_morph, and year to representative values)
 new_data <- expand.grid(
   temp = fixed_temp, 
   eco_morph = eco_morph, 
@@ -414,9 +410,7 @@ new_data <- expand.grid(
   year = changing_year
 )
 
-# Predict abundance for this new dataset
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
-# Predict abundance for this range of sampling efforts
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
 
 
