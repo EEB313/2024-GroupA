@@ -360,7 +360,7 @@ plot(new_model)
 AIC(new_model)
 ```
 
-This new model now has the lowest AIC, with the number of observations, temperature, interaction of temperature and ecomorph, ecomorph type, and year having extremely low probabilitiesthat the true effect is 0 (albeit some of these coefficients appear numerically really small). To further assess the impacts each covariate has on the model, we want to now perform some analyses to observe how each covariate uniquely affects abundance when all other covariates are held constant.
+This new model now has the lowest AIC, with the number of observations, temperature, interaction of temperature and ecomorph, ecomorph type, and year having extremely low probabilities that the true effect is 0 (albeit some of these coefficients appear numerically really small). To further assess the impacts each covariate has on the model, we want to now perform some analyses to observe how each covariate uniquely affects abundance when all other covariates are held constant.
 
 First, what happens when we look specifically at how sampling effort (number of observations) affects observed abundances?
 
@@ -431,4 +431,4 @@ ggplot(data, aes(x = year, y = abundance, color = eco_morph)) +
 
 ```
 
-From this, we can see that when all other covariates are held constant, abundance is overall predicted to slightly increase with year. If we accept this relationship as significant at alpha \< 0.05, this could call into question a fundamental assumption of our model, which is that abundances are independent year to year and not dependent on each other. However, given the earlier analysis showing the extent of the relationship with sampling effort, and the and argue that the relationships we observe are better explained by the systemic bias and inconsistencies in sampling effort across locations, months and times, and due to random variation year to year, rather than a lack of independence in the abundance observations.
+From this, we can see that when all other covariates are held constant, abundance is overall predicted to slightly increase with year. If we accept this relationship as significant at alpha \< 0.05, this could call into question a fundamental assumption of our model, which is that abundances are independent year to year and not dependent on each other. However, given the earlier analysis showing the extent of the relationship with sampling effort, and the and argue that the relationships we observe are better explained by the systemic bias and inconsistencies in sampling effort across locations, months and times, and due to random variation year to year, rather than a lack of independence in the abundance observations. 
