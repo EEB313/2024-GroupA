@@ -142,12 +142,15 @@ rbind(
   data.frame(abundance = as.numeric(abun_and_temps$leadback_abun), eco_morph = "leadback", temp = as.numeric(abun_and_temps$avg_temp)),
   data.frame(abundance = as.numeric(abun_and_temps$redback_abun), eco_morph = "redback", temp = as.numeric(abun_and_temps$avg_temp))
 ) -> data
+
 ```
+
+
 
 Now, lets fit linear models first to the data:
 
 ```{r}
-lmmodel <- lm(abundance ~ temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
+lmmodel <- glm(abundance ~ temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
 summary(lmmodel)
 AIC(lmmodel)
 ```
@@ -160,7 +163,7 @@ summary(quadmodel)
 AIC(quadmodel)
 ```
 
-Based off of this, our linear model appears to be the better fit to the data. We based this by comparing the AICs, which assesses which model is a better fit to the data. The lower the AIC, the superior the model fit.
+Based off of this, our quadratic model appears to be the better fit to the data. We based this by comparing the AICs, which assesses which model is a better fit to the data. The lower the AIC, the superior the model fit.
 
 Now, we want to create a prediction grid for our model to predict how abundance changes in response to temperature changes for each ecomorph.
 
@@ -174,7 +177,7 @@ new_data <- expand.grid(
 Here we are creating a column for predicted values, that we can add a line for in the model.
 
 ```{r}
-predictions <- predict(lmmodel, newdata = new_data, type = "response")
+predictions <- predict(quadmodel, newdata = new_data, type = "response")
 new_data$predicted <- predictions
 ```
 
@@ -208,6 +211,7 @@ precipitation <- salamanders %>%
   mutate(Date = dmy(Date), 
          Year = as.numeric(Year),
          Month = month(Date, label = TRUE)) 
+
 ```
 
 Now, we want to calculate the average precipitation for a given year, month, and location.
@@ -215,8 +219,7 @@ Now, we want to calculate the average precipitation for a given year, month, and
 ```{r}
 precipitation <- precipitation %>%
   group_by(Year, Month, Plot.Name) %>%
-    summarize(
-    avg_precip = mean(precipitation, na.rm = TRUE))
+    summarize(avg_precip = mean(precipitation, na.rm = TRUE))
 ```
 
 Now, we want to join the precipitation to the abundance temps and precipitation data, and ensure that any NAs are filtered that could have been reintroduced in combining datasets.
@@ -246,13 +249,13 @@ rbind(
 
 ```{r}
 
-lmmodel2 <- lm(abundance ~ temp + eco_morph + temp*eco_morph + precipitation, data = data, family = "poisson")
-summary(lmmodel2)
+quadmodel2 <- glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph + precipitation, data = data, family = "poisson")
+summary(quadmodel2)
 
-AIC(lmmodel2)
+AIC(quadmodel2)
 ```
 
-Introducing precipitation as a covariate actually increases the AIC, so this model is not a better fit to the data. Thus, we will not be including precipitation in our models going forward.
+Introducing precipitation as a covariate decreases the AIC by around 4 units, so we will incorporate precipitation in the models going forward. 
 
 6.  Sampling bias and Ensuring Independence of Observations
 
@@ -343,21 +346,21 @@ Now we want to create the final dataframe to analyze the model accounting for ye
 
 ```{r}
 rbind(
-  data.frame(abundance = abun_temps_precip$leadback_abun, eco_morph = "leadback", temp = as.numeric(abun_temps_precip$avg_temp), year = as.numeric(abun_temps_precip$Year)),
-  data.frame(abundance = abun_temps_precip$redback_abun, eco_morph = "redback", temp = as.numeric(abun_temps_precip$avg_temp), year = as.numeric(abun_temps_precip$Year))) -> data
+  data.frame(abundance = abun_temps_precip$leadback_abun, eco_morph = "leadback", temp = as.numeric(abun_temps_precip$avg_temp), precipitation = as.numeric(abun_temps_precip$avg_precip), year = as.numeric(abun_temps_precip$Year)), 
+  data.frame(abundance = abun_temps_precip$redback_abun, eco_morph = "redback", temp = as.numeric(abun_temps_precip$avg_temp), precipitation = as.numeric(abun_temps_precip$avg_precip), year = as.numeric(abun_temps_precip$Year))) -> data
   
 rbind(
   data.frame(data, num_observations = as.numeric(abun_temps_precip$number_of_observations, Month = abun_temps_precip$Month))
 ) -> data
 
 
-new_model <-  lm(abundance ~ temp + eco_morph + temp*eco_morph + num_observations + year, data = data, family = "poisson")
+new_model <-  glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph + precipitation + num_observations + year, data = data, family = "poisson")
 summary(new_model)
 plot(new_model) 
 AIC(new_model)
 ```
 
-This new model now has the lowest AIC, with the number of observations having an extremely low probability that the true effect is 0. To further assess the impacts each covariate has on the model, we want to now perform some analyses to observe how each covariate uniquely affects abundance when all other covariates are held constant.
+This new model now has the lowest AIC, with the number of observations, temperature, interaction of temperature and ecomorph, ecomorph type, and year having extremely low probabilitiesthat the true effect is 0 (albeit some of these coefficients appear numerically really small). To further assess the impacts each covariate has on the model, we want to now perform some analyses to observe how each covariate uniquely affects abundance when all other covariates are held constant.
 
 First, what happens when we look specifically at how sampling effort (number of observations) affects observed abundances?
 
@@ -367,12 +370,16 @@ new_observations <- seq(min(data$num_observations), max(data$num_observations), 
 fixed_temp <- mean(data$temp) # Hold temperature constant at the average 
 fixed_year <- median(data$year) # Hold year constant using the median year
 eco_morph <- c("redback", "leadback") 
+precipitation <- mean(data$precipitation) #fixed precipitation at mean precipitation 
+
+
 
 new_data <- expand.grid(
   temp = fixed_temp, 
   eco_morph = eco_morph, 
   num_observations = new_observations, 
-  year = fixed_year
+  year = fixed_year,
+  precipitation = precipitation
 )
 
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
@@ -404,7 +411,8 @@ new_data <- expand.grid(
   temp = fixed_temp, 
   eco_morph = eco_morph, 
   num_observations = fixed_observations, 
-  year = changing_year
+  year = changing_year, 
+  precipitation = precipitation
 )
 
 new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
@@ -423,4 +431,4 @@ ggplot(data, aes(x = year, y = abundance, color = eco_morph)) +
 
 ```
 
-From this, we can see that when all other covariates are held constant, abundance is overall predicted to slightly increase with year. If we accept this relationship as significant at alpha \< 0.05, this could call into question a fundamental assumption of our model, which is that abundances are independent year to year and not dependent on each other. However, given the earlier analysis showing the extent of the relationship with sampling effort, we want to use a significance level at alpha \< 0.01, and argue that the relationships we observe are better explained by the systemic bias and inconsistencies in sampling effort across locations, months and times, rather than a lack of independence in the abundance observations.
+From this, we can see that when all other covariates are held constant, abundance is overall predicted to slightly increase with year. If we accept this relationship as significant at alpha \< 0.05, this could call into question a fundamental assumption of our model, which is that abundances are independent year to year and not dependent on each other. However, given the earlier analysis showing the extent of the relationship with sampling effort, and the and argue that the relationships we observe are better explained by the systemic bias and inconsistencies in sampling effort across locations, months and times, and due to random variation year to year, rather than a lack of independence in the abundance observations.
