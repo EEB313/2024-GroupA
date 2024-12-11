@@ -61,7 +61,7 @@ head(leadback_abundance)
 
 ```
 
-Now, we want to combine these calulated abundances into one dataframe, joining the data correctly. We do this by joining by shared Year, Location, and Month to ensure the data points are matched correctly.
+Now, we want to combine these calculated abundances into one dataframe, joining the data correctly. We do this by joining by shared Year, Location, and Month to ensure the data points are matched correctly.
 
 ```{r}
 #Combining the two abundances into one data frame and joining by shared rows 
@@ -77,24 +77,26 @@ We are interested in some potentially biologically significant variables for sal
 #Looking at the soil data to see if we can use it and have consistent observations across time - soil metrics could be indicators for precipitation 
 soil_ph <- present_salamanders %>%
   filter(!Soil.pH %in% c("N/A", "")) # only 2016 -- might not be enough -  400 raw observations, without manipulations and calculations
+soil_ph
 
 soil_moisture <- present_salamanders %>%
   filter(!Soil.Moisture %in% c("N/A", "")) #no observations!
-
+soil_moisture
 
 #Air temperature and precipitation ?
 temp <- present_salamanders %>%
   filter(!Air.Temperature..degC. %in% c("N/A", "")) #a good number of observations across the years -- same number as that in present salamanders - 6k!
+temp
 
 percipitation <- present_salamanders %>%
   filter(!Precipitation.in.the.Last.24.hours..mm. %in% c("N/A", "")) # 6k observations too!
-
+percipitation
 ```
 
 We can conclude that soil moisture is completely unusable, and soil ph would not grant proper analyses due to only one year being present -- thus both cannot be utilized for our subsequent model analyses, especially in comparison to our other environmental predictors which have so many more years.
 
 
-Focusing on the ones with more observations for now -- temperature and percipitation!
+Focusing on the ones with more observations for now -- temperature and precipitation!
 
 We want to incorporate average temperatures across month and year, since we are interested in how temperature affects abundance specifically. We group by the same columns as earlier, month, year and location.
 
@@ -139,6 +141,7 @@ precipitation_bymonth_year$Year <- as.numeric(precipitation_bymonth_year$Year) #
 precipitation_bymonth_year
 ```
 
+Now let's add it to the dataframe
 ```{r}
 abun_and_env <- full_join(abun_and_temps, precipitation_bymonth_year,
                              by = c("Year", "Plot.Name", "Month"))
@@ -146,11 +149,10 @@ abun_and_env <- full_join(abun_and_temps, precipitation_bymonth_year,
 abun_and_env
 ```
 
-Note: This measure of precipitation is only measuring the precipitation during the sampling event though - not a true biological average, however we will attempt with it
 
 3.  Data visualization
 
-Now that we have our data correctly situated, we aimed to visualize the raw data of abundance against temperature for each ecomoprh separately.
+Now that we have our data correctly situated, we aimed to visualize the raw data of abundance against temperature and precipitation for each ecomoprh separately.
 
 ```{r}
 ggplot(abun_and_env, aes(x = avg_temp, y = redback_abun)) +
@@ -191,7 +193,9 @@ ggplot(abun_and_env, aes(x = avg_precip, y = leadback_abun)) +
 
 From this, we can see a general trend that as the average temperature at a given time increases, the observed abundances appear to be increasing. There appears to be some data points at higher temperatures that indicate lower abundance, and that abundance increases with temperature but then decreases, which could suggest that a quadratic regression would fit the data better. But we will test for this directly in our next steps.
 
-Precipitation does not seem to hold a certain strong trend, but there are higher abundances (but also higher amounts of observations) at lower precipitations.  Based on the visualization, we decided to try to fit both a linear model and a quadratic model.
+Precipitation does not seem to hold a certain strong trend, but there are higher abundances (but also higher amounts of observations) at lower precipitations.
+
+Based on the visualization, we decided to try to fit both a linear model and a quadratic model.
 
 
 4.  Fitting the models to our data 
