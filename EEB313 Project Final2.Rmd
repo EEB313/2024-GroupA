@@ -198,8 +198,6 @@ Precipitation does not seem to hold a certain strong trend, but there are higher
 Based on the visualization, we decided to try to fit both a linear model and a quadratic model.
 
 
-4.  Fitting the models to our data 
-
 
 First, we want to combine the two abundances into one column, and create a new column specifying ecomorph type. This makes it simpler in the long run, when we want to visualize ecomorph as a covariate directly and interaction terms incorporating ecomorph type. This also helps to include more observations into our model, which can help increase the statistical power.
 
@@ -224,66 +222,7 @@ data <- rbind(
 ```
 
 
-
-Now, lets fit linear models first to the data:
-
-```{r}
-lmmodel1 <- glm(abundance ~ temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
-summary(lmmodel1)
-AIC(lmmodel1)
-
-
-```
-
-Let's fit quadratic:
-
-```{r}
-quadmodel <- glm(abundance ~ temp + eco_morph+ I(temp^2) + temp*eco_morph , data = data, family = "poisson")
-summary(quadmodel)
-AIC(quadmodel)
-```
-
-Based off of this, our quadratic model appears to be the better fit to the data. We based this by comparing the AICs, which assesses which model is a better fit to the data. The lower the AIC, the superior the model fit.
-
-Now, we want to create a prediction grid for our model to predict how abundance changes in response to temperature changes for each ecomorph.
-
-```{r}
-new_data <- expand.grid(
-    temp = seq(min(data$temp), max(data$temp), length.out = 100),
-    eco_morph = unique(data$eco_morph)
-)
-```
-
-Here we are creating a column for predicted values, that we can add a line for in the model.
-
-```{r}
-predictions <- predict(quadmodel, newdata = new_data, type = "response")
-new_data$predicted <- predictions
-```
-
-```{r}
-plot(abundance ~ temp, data = data, col = as.factor(eco_morph), pch = 16, 
-     main = "Temperature Effects on Salamander Abundance",
-     xlab = "Temperature (°C)",
-     ylab = "Abundance")
-     
-#adding prediction lines for each ecomorph 
-  for(morph in unique(data$eco_morph)) {
-    subset_data <- new_data[new_data$eco_morph == morph,]
-    lines(subset_data$temp, subset_data$predicted, 
-          col = as.factor(morph))
-    }
-legend("topright", 
-       legend = unique(data$eco_morph),
-       col = as.factor(unique(data$eco_morph)), 
-       pch = 16)
-
-```
-
-Here, we can see lines showing the predicted abundances at a given temperature for each ecomorph.
-
-
-5.  Sampling bias and Ensuring Independence of Observations
+4.  Sampling bias and Ensuring Independence of Observations
 
 Since we decided to use abundance as a response variable, this could raise the concern that abundance observations are not independent of each other (or could be attributed to abundance patterns from previous years.) To negate this, we first visualized what were the general abundance patterns year to year for the morphs.
 
@@ -388,7 +327,7 @@ data <- rbind(
 
 ```
 
-6. Model Comparisons
+5. Model Comparisons
 
 ```{r}
 
@@ -445,7 +384,7 @@ The last model has the lowest AIC, with the number of observations, temperature,
 Let's first rename it
 
 ```{r}
-new_model <-  glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph + precipitation + num_observations + year, data = data, family = "poisson")
+new_model <-  glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph + year + num_observations, data = data, family = "poisson")
 summary(new_model)
 ```
 
