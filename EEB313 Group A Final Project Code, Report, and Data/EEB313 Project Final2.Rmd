@@ -1,1 +1,461 @@
+---
+title: "EEB313 Project Final"
+output: html_document
+date: "2024-12-09"
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) #First install/read in any necessary packages
+library(lubridate)
+library(stringr)
+citation("stringr")
+```
+
+1.  Loading in the salamanders dataset
+
+```{r}
+#Read in the data set
+salamanders <- read.csv("salamander.csv")
+salamanders
+```
+
+2.  Wrangling the data
+
+-   Lots of NAs in the dataset and we are interested in the abundances of each unique morph, so we have to filter out the observations that have NAs for those columns
+
+```{r}
+#Get rid of the first row (French Translation of column names) and filter out the NAs of the abundance counts for each morph type
+present_salamanders <- salamanders %>%
+  slice(-c(1)) %>%
+  filter(!Redback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") %>%
+  filter(!Leadback.form.of.Eastern.Redback.Salamander.Count %in% "N/A") 
+present_salamanders #lots of observations lost after filtering 
+```
+
+Additionally, since the Dates Months and Years are in the dataset as characters, lets use lubridate to alter these columns and prepare them to be analyzed
+
+```{r}
+present_salamanders <- present_salamanders %>% #Using Lubridate to create dates and month columns in correct format 
+   mutate(Date = dmy(Date),  
+         Month = month(Date, label = TRUE)) 
+present_salamanders 
+```
+
+Next in our wrangling, we need to calculate Salamander abundances for each ecomorph type -- our RESPONSE VARIABLE
+
+```{r}
+#Calculating the redback abundances 
+redback_abundance <- present_salamanders %>%
+  mutate(Redback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Redback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(redback_abun = sum(Redback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
+# Then check the result
+head(redback_abundance)
+#Calculating the leadback abundances
+leadback_abundance <- present_salamanders %>%
+  mutate(Leadback.form.of.Eastern.Redback.Salamander.Count = as.numeric(Leadback.form.of.Eastern.Redback.Salamander.Count)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(leadback_abun = sum(Leadback.form.of.Eastern.Redback.Salamander.Count, na.rm = TRUE))
+head(leadback_abundance)
+
+```
+
+Now, we want to combine these calculated abundances into one dataframe, joining the data correctly. We do this by joining by shared Year, Location, and Month to ensure the data points are matched correctly.
+
+```{r}
+#Combining the two abundances into one data frame and joining by shared rows 
+total_abundances <- full_join(redback_abundance, leadback_abundance, 
+                             by = c("Month", "Year", "Plot.Name"))
+total_abundances 
+```
+
+
+We are interested in some potentially biologically significant variables for salamander abundances- lets look at potential ones we could incorporate or analyze in our future models
+
+```{r}
+#Looking at the soil data to see if we can use it and have consistent observations across time - soil metrics could be indicators for precipitation 
+soil_ph <- present_salamanders %>%
+  filter(!Soil.pH %in% c("N/A", "")) # only 2016 -- might not be enough -  400 raw observations, without manipulations and calculations
+soil_ph
+
+soil_moisture <- present_salamanders %>%
+  filter(!Soil.Moisture %in% c("N/A", "")) #no observations!
+soil_moisture
+
+#Air temperature and precipitation ?
+temp <- present_salamanders %>%
+  filter(!Air.Temperature..degC. %in% c("N/A", "")) #a good number of observations across the years -- same number as that in present salamanders - 6k!
+temp
+
+percipitation <- present_salamanders %>%
+  filter(!Precipitation.in.the.Last.24.hours..mm. %in% c("N/A", "")) # 6k observations too!
+percipitation
+```
+
+We can conclude that soil moisture is completely unusable, and soil ph would not grant proper analyses due to only one year being present -- thus both cannot be utilized for our subsequent model analyses, especially in comparison to our other environmental predictors which have so many more years.
+
+
+Focusing on the ones with more observations for now -- temperature and precipitation!
+
+We want to incorporate average temperatures across month and year, since we are interested in how temperature affects abundance specifically. We group by the same columns as earlier, month, year and location.
+
+```{r}
+#find the average temperature for a given month, year, and location
+temp_by_month_and_year <- present_salamanders %>%
+  filter(!Air.Temperature..degC. %in% "N/A") %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(avg_temp = mean(Air.Temperature..degC., na.rm = TRUE))
+
+temp_by_month_and_year$Year <- as.numeric(temp_by_month_and_year$Year) #convert this to numeric
+temp_by_month_and_year
+```
+
+Now join the average temperature data to the abundances data:
+
+```{r}
+#join the temperatures with the abundance data 
+total_abundances$Year <- as.numeric(temp_by_month_and_year$Year) #convert this to numeric
+
+
+abun_and_temps <- full_join(total_abundances, temp_by_month_and_year,
+                             by = c("Year", "Plot.Name", "Month"))
+
+abun_and_temps
+```
+
+
+Now, we want to calculate the average precipitation for a given year, month, and location.
+
+```{r}
+precipitation_bymonth_year <- present_salamanders %>%
+  filter(!Precipitation.in.the.Last.24.hours..mm. %in% "N/A") %>%
+  mutate(Precipitation.in.the.Last.24.hours..mm. = as.numeric(Precipitation.in.the.Last.24.hours..mm.)) %>%
+  group_by(Year, Month, Plot.Name) %>%
+    summarize(avg_precip = mean(Precipitation.in.the.Last.24.hours..mm., na.rm = TRUE))
+```
+
+```{r}
+precipitation_bymonth_year$Year <- as.numeric(precipitation_bymonth_year$Year) #convert this to numeric
+precipitation_bymonth_year
+```
+
+Now let's add it to the dataframe
+```{r}
+abun_and_env <- full_join(abun_and_temps, precipitation_bymonth_year,
+                             by = c("Year", "Plot.Name", "Month"))
+
+abun_and_env
+```
+
+
+3.  Data visualization
+
+Now that we have our data correctly situated, we aimed to visualize the raw data of abundance against temperature and precipitation for each ecomoprh separately.
+
+```{r}
+ggplot(abun_and_env, aes(x = avg_temp, y = redback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Temperature", 
+       y = "Redback Abundance",
+       title = "Redback Salamander Abundance with Average Temperature") +
+  theme_minimal() 
+
+
+ggplot(abun_and_env, aes(x = avg_temp, y = leadback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Temperature", 
+       y = "Leadback Abundance",
+       title = "Leadback Salamander Abundance with Average Temperature") +
+  theme_minimal() 
+
+
+ggplot(abun_and_env, aes(x = avg_precip, y = redback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Precipitation", 
+       y = "Redback Abundance",
+       title = "Redback Salamander Abundance with Average Precipitation") +
+  theme_minimal() 
+
+
+ggplot(abun_and_env, aes(x = avg_precip, y = leadback_abun)) +
+  geom_point(size = 3, alpha = 0.7) + 
+  # facet_wrap(~Plot.Name) +  
+  labs(x = "Average Precipitation", 
+       y = "Redback Abundance",
+       title = "Leadback Salamander Abundance with Average Precipitation") +
+  theme_minimal() 
+```
+
+From this, we can see a general trend that as the average temperature at a given time increases, the observed abundances appear to be increasing. There appears to be some data points at higher temperatures that indicate lower abundance, and that abundance increases with temperature but then decreases, which could suggest that a quadratic regression would fit the data better. But we will test for this directly in our next steps.
+
+Precipitation does not seem to hold a certain strong trend, but there are higher abundances (but also higher amounts of observations) at lower precipitations.
+
+Based on the visualization, we decided to try to fit both a linear model and a quadratic model.
+
+
+
+First, we want to combine the two abundances into one column, and create a new column specifying ecomorph type. This makes it simpler in the long run, when we want to visualize ecomorph as a covariate directly and interaction terms incorporating ecomorph type. This also helps to include more observations into our model, which can help increase the statistical power.
+
+```{r}
+data <- rbind(
+  data.frame(
+    abundance = as.numeric(abun_and_env$leadback_abun),
+    eco_morph = "leadback",
+    temp = as.numeric(abun_and_env$avg_temp),
+    precipitation = as.numeric(abun_and_env$avg_precip),
+    location = abun_and_env$Plot.Name
+  ),
+  data.frame(
+    abundance = as.numeric(abun_and_env$redback_abun),
+    eco_morph = "redback",
+    temp = as.numeric(abun_and_env$avg_temp),
+    precipitation = as.numeric(abun_and_env$avg_precip),
+    location = abun_and_env$Plot.Name
+  )
+)
+
+```
+
+
+4.  Sampling bias and Ensuring Independence of Observations
+
+Since we decided to use abundance as a response variable, this could raise the concern that abundance observations are not independent of each other (or could be attributed to abundance patterns from previous years.) To negate this, we first visualized what were the general abundance patterns year to year for the morphs.
+
+```{r}
+#First some wranging to calculate the yearly abundances 
+new_abun_temp_precip <- abun_and_env %>%
+  group_by(Year) %>%
+  summarize(yearly_abun_lead = sum(leadback_abun),
+            yearly_abun_red = sum(redback_abun)) %>%
+  arrange((Year))
+#lets first look at how abundance patterns are changing annually 
+
+plot(new_abun_temp_precip$Year, new_abun_temp_precip$yearly_abun_lead, type = 'l', 
+     col = 'blue3', 
+     main = "Salamander Abundance by Year and Ectomorph",
+     xlab = 'Year',
+     ylab = 'Salamander Abundance',
+    ylim = range(c(0, 450)))
+lines(new_abun_temp_precip$Year, new_abun_temp_precip$yearly_abun_red, col = 'red3')
+legend("topright", 
+       legend = c("Leadback", "Redback"),
+       col = c("blue3", "red3"),
+       lty = 1)
+```
+
+From this we can visually see that there doesn't seem that abundance is steadily increasing with year (as we could maybe expect to see if abundances were not independent of each other). In other words, abundance being higher in one year does not appear to mean abundance is going to be higher in the year following it. However, we will account for this in our model by including year as a covariate.
+
+Further, through our project concerns of sampling bias have come up. We have evidence to suggest that sampling effort has not remained consistent across the duration of the study.
+
+```{r}
+unique(present_salamanders$Date)
+```
+
+Looking at all the unique dates where observations were recorded from, we can see that the dates across the duration of the study are very few overall. Certain months are sampled more consistently over time (May) while others (June) are sampled less consistently. This leads us to question if there are simply less observations or sampling periods at higher temperatures, due to more of the sampling effort taking place at months that likely wouldn't have higher temperatures (\> 25 degrees Celsius).
+
+```{r}
+testforfrequency <- present_salamanders %>%
+  mutate(Air.Temperature..degC. = as.numeric(Air.Temperature..degC.)) %>%
+  mutate(Year = as.numeric(Year)) 
+  
+
+testforfrequency %>%
+  ggplot() +
+  geom_histogram(aes(x = Air.Temperature..degC.), bins = 30) + 
+  labs(title = "Frequency of Observations by Temperature", x = "Temperature (°C)", y = "Number of Observations") +
+  theme_minimal()
+```
+
+Here we see that the majority of the observations takes place within the 10-20 degree celsius range, with very few observations taking place in the 25-30+ degree range. Since this histogram accounts for all observations (the total number of recorded observations/samples at a given temperature range, not abundance), it raises the concern that the trends we see with higher abundances of salamanders are attributed less so to a temperature response and more so to the increased sampling effort in certain conditions over others.
+
+We now want to add year as a covariate in the model (to ensure that abundance observations are independent of each other) and number of observations (which acts as measure of sampling bias by summing the total number of observations in a given condition- grouped by month, year, and location)
+
+```{r}
+present_salamanders1 <- present_salamanders%>%
+  group_by(Year, Month, Plot.Name) %>%
+  summarize(number_of_observations = n()) #creating number of observations
+present_salamanders1
+
+
+num_observations<- data.frame(present_salamanders1$Year, present_salamanders1$Month, present_salamanders1$Plot.Name, present_salamanders1$number_of_observations)
+num_observations <- num_observations %>%
+  mutate(Year = as.numeric(num_observations$present_salamanders1.Year)) %>%
+  mutate(Month = present_salamanders1.Month) %>%
+  mutate(Plot.Name = present_salamanders1.Plot.Name) %>%
+  mutate(number_of_observations = present_salamanders1.number_of_observations) #some wrangling to simplify column names
+
+abun_and_env <- full_join(
+  abun_and_env,
+  num_observations, 
+  by = c("Year", "Plot.Name", "Month")
+) #joining the data frames
+
+abun_and_env <- abun_and_env[, -c(8, 9, 10, 11)] #removing redundant columns
+
+colnames(abun_and_env) #verifying accurate column removal 
+
+```
+
+Now we want to create the final dataframe to analyze the model accounting for year and sampling bias:
+
+```{r}
+data <- rbind(
+  data.frame(
+    abundance = abun_and_env$leadback_abun,
+    eco_morph = "leadback",
+    temp = as.numeric(abun_and_env$avg_temp),
+    precipitation = as.numeric(abun_and_env$avg_precip),
+    year = as.numeric(abun_and_env$Year),
+    num_observations = as.numeric(abun_and_env$number_of_observations.y),
+    Month = abun_and_env$Month
+  ), 
+  data.frame(
+    abundance = abun_and_env$redback_abun,
+    eco_morph = "redback",
+    temp = as.numeric(abun_and_env$avg_temp),
+    precipitation = as.numeric(abun_and_env$avg_precip),
+    year = as.numeric(abun_and_env$Year),
+    num_observations = as.numeric(abun_and_env$number_of_observations.y),
+    Month = abun_and_env$Month
+  )
+)
+
+```
+
+5. Model Comparisons
+
+```{r}
+
+#Let's try a few different combinations for Linear models
+
+linear1 <- glm(abundance ~ temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
+summary(linear1)
+AIC(linear1) #2712.48
+
+linear2 <- glm(abundance ~ precipitation + eco_morph + precipitation*eco_morph, data = data, family = "poisson")
+summary(linear2)
+AIC(linear2) #2842.799
+
+linear3 <- glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph, data = data, family = "poisson")
+summary(linear3)
+AIC(linear3) # 2701.135
+
+linear4 <- glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph + precipitation*eco_morph, data = data, family = "poisson")
+summary(linear4)
+AIC(linear4) # 2702.288
+
+linear5 <- glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph + year, data = data, family = "poisson")
+summary(linear5)
+AIC(linear5) # 2703.09
+
+linear6 <- glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph + year + num_observations, data = data, family = "poisson")
+summary(linear6)
+AIC(linear6) # 2129.936 !! much lower with number of observations
+
+#Now let's try Quadratic
+
+Quadratic1 <- glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph, data = data, family = "poisson")
+summary(Quadratic1)
+AIC(Quadratic1) #2642.326
+
+Quadratic2 <- glm(abundance ~ temp +  I(temp^2) + eco_morph + precipitation + temp*eco_morph, data = data, family = "poisson")
+summary(Quadratic2)
+AIC(Quadratic2) #2153.577
+
+Quadratic3 <- glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph + precipitation + num_observations, data = data, family = "poisson")
+summary(Quadratic3)
+AIC(Quadratic3) #2155.55
+
+Quadratic4 <- glm(abundance ~ temp +  I(temp^2) + eco_morph + temp*eco_morph + precipitation + num_observations + year, data = data, family = "poisson")
+summary(Quadratic4)
+AIC(Quadratic4) #2130.164
+
+
+```
+
+
+The last model has the lowest AIC, with the number of observations, temperature, interaction of temperature and ecomorph, ecomorph type, and year having extremely low probabilities that the true effect is 0 (albeit some of these coefficients appear numerically really small). To further assess the impacts each covariate has on the model, we want to now perform some analyses to observe how each covariate uniquely affects abundance when all other covariates are held constant.
+
+Let's first rename it
+
+```{r}
+new_model <-  glm(abundance ~ precipitation + temp + eco_morph + temp*eco_morph + year + num_observations, data = data, family = "poisson")
+summary(new_model)
+```
+
+
+First, what happens when we look specifically at how sampling effort (number of observations) affects observed abundances?
+
+```{r}
+# Define fixed values for predictors - define sampling effort
+new_observations <- seq(min(data$num_observations), max(data$num_observations), by = 10) 
+fixed_temp <- mean(data$temp) # Hold temperature constant at the average 
+fixed_year <- median(data$year) # Hold year constant using the median year
+eco_morph <- c("redback", "leadback") 
+precipitation <- mean(data$precipitation) #fixed precipitation at mean precipitation 
+
+
+
+new_data <- expand.grid(
+  temp = fixed_temp, 
+  eco_morph = eco_morph, 
+  num_observations = new_observations, 
+  year = fixed_year,
+  precipitation = precipitation
+)
+
+new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
+
+
+ggplot(data, aes(x = num_observations, y = abundance, color = eco_morph)) +
+  geom_point() +  
+  geom_line(data = new_data, aes(x = num_observations, y = predicted_abundance, color = eco_morph)) +  
+  labs(
+    x = "Sampling Effort (Number of Observations)",
+    y = "Abundance",
+    color = "Ecomorph"
+  ) +
+  ggtitle("Effect of Sampling Effort on Abundance") +
+  theme_minimal()
+
+```
+
+This graph helps visualize that when all other covariates are held constant, there is a clear positive relationship between sampling effort and observed abundances, with the prediction line for each ecomorph displayed.
+
+Now, we want to look at how abundance patterns with year change, with all other covariates held constant.
+
+```{r}
+#Change fixed params
+fixed_observations <- max(data$num_observations) #holding number of observations constant at highest number 
+changing_year <- data$year 
+
+new_data <- expand.grid(
+  temp = fixed_temp, 
+  eco_morph = eco_morph, 
+  num_observations = fixed_observations, 
+  year = changing_year, 
+  precipitation = precipitation
+)
+
+new_data$predicted_abundance <- predict(new_model, new_data, type = "response")
+
+
+ggplot(data, aes(x = year, y = abundance, color = eco_morph)) +
+  geom_point() +  
+  geom_line(data = new_data, aes(x = year, y = predicted_abundance, color = eco_morph)) +  
+  labs(
+    x = "Year",
+    y = "Abundance",
+    color = "Ecomorph"
+  ) +
+  ggtitle("Effect of Year on Abundance") +
+  theme_minimal()
+
+```
+
+From this, we can see that when all other covariates are held constant, abundance is overall predicted to slightly increase with year. If we accept this relationship as significant at alpha \< 0.05, this could call into question a fundamental assumption of our model, which is that abundances are independent year to year and not dependent on each other. However, given the earlier analysis showing the extent of the relationship with sampling effort, and the and argue that the relationships we observe are better explained by the systemic bias and inconsistencies in sampling effort across locations, months and times, and due to random variation year to year, rather than a lack of independence in the abundance observations. 
